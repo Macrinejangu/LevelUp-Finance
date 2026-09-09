@@ -102,3 +102,4 @@ if __name__ == "__main__":
     reloaded = TransactionLedger(account_id=1)
     reloaded.load()
     print("After reload:", reloaded.get_transactions())
+#the changes are now updated in the database
