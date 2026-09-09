@@ -1,34 +1,51 @@
-"""
-Quest classes.
-→ Base Quest class, plus DailyQuest, WeeklyQuest, BossQuest.
-"""
+from datetime import date, timedelta
 
 
 class Quest:
     def __init__(self, name, reward_xp):
-        pass
+        self.name = name
+        self.reward_xp = reward_xp
 
     def check_completion(self, ledger):
-        pass
+        raise NotImplementedError
 
     def get_reward(self):
-        pass
+        return self.reward_xp
 
 
 class DailyQuest(Quest):
     def check_completion(self, ledger):
-        pass
+        today = date.today().isoformat()
+        transactions = ledger.get_transactions(
+            start_date=today,
+            end_date=today
+        )
+        return len(transactions) > 0
 
 
 class WeeklyQuest(Quest):
     def check_completion(self, ledger):
-        pass
+        today = date.today()
+        week_start = today - timedelta(days=today.weekday())
+
+        transactions = ledger.get_transactions(
+            start_date=week_start.isoformat(),
+            end_date=today.isoformat()
+        )
+
+        return len(transactions) > 0
 
 
 class BossQuest(Quest):
-    def check_completion(self, ledger):
-        pass
+    def __init__(self, name, reward_xp, target_amount):
+        super().__init__(name, reward_xp)
+        self.target_amount = target_amount
 
-    # → returns how close to the target, boss battles show a progress bar
     def get_progress(self, ledger):
-        pass
+        transactions = ledger.get_transactions()
+        total = sum(transaction["amount"] for transaction in transactions)
+
+        return min(abs(total), self.target_amount)
+
+    def check_completion(self, ledger):
+        return self.get_progress(ledger) >= self.target_amount
