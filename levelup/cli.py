@@ -4,7 +4,7 @@ CLI menu and command routing.
 → Logging a transaction now checks daily/weekly quest completion and
   awards XP automatically, then the AI coach narrates it.
 """
-from levelup.database import init_db
+from levelup.database import init_db, get_connection
 from levelup.accounts import SavingsAccount, CheckingAccount, CreditAccount
 from levelup.ledger import TransactionLedger
 from levelup.budget_engine import BudgetEngine
@@ -72,7 +72,18 @@ def main():
                 print("Not a valid account type.")
                 continue
 
+            # → Account itself doesn't have save()/load() yet, this is a stopgap: write just enough of a row so account_id=1 actually
+            #   exists in the database, which TransactionLedger.save() needs to satisfy the foreign key. Full Account persistence is a known limitation, documented in the README, not built tonight.
+            conn = get_connection()
+            conn.execute(
+                "INSERT OR REPLACE INTO accounts (id, name, type, balance) VALUES (1, ?, ?, ?)",
+                (name, account_type, starting_balance),
+            )
+            conn.commit()
+            conn.close()
+
             ledger = TransactionLedger(account_id=1)
+            ledger.load()  # → pull in any transactions saved from a previous session
             budget_engine = BudgetEngine(ledger)
             print(f"Created {account_type} account for {name}.")
 
@@ -105,6 +116,7 @@ def main():
             amount = get_valid_number("Transaction amount (negative for spending): ")
             category = input("Category: ")
             ledger.add_transaction(amount, category)
+            ledger.save()  # → persist immediately, don't wait until exit
             print("Transaction logged.")
 
             # → check quest completion right after logging, this is the wiring that was missing, nothing triggered XP automatically before this
