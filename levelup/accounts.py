@@ -4,6 +4,9 @@ class Account:
         self.name = name
         self.balance = balance
 
+    def get_balance(self):
+         return self.balance
+
     def deposit(self, amount: float):
         if amount <= 0:
             raise ValueError("Amount must be a number greater than zero")
