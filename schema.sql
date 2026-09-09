@@ -5,7 +5,7 @@
 -- Backs the Account class and its subclasses
 -- (SavingsAccount, CheckingAccount, CreditAccount)
 
-CREATE TABLE accounts (
+CREATE TABLE IF NOT EXISTS accounts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     type TEXT NOT NULL CHECK (type IN ('savings', 'checking', 'credit')),
@@ -17,7 +17,7 @@ CREATE TABLE accounts (
 -- amount is signed: positive = deposit, negative = withdrawal
 -- This keeps category totals and budget math a simple sum, no branching needed.
 
-CREATE TABLE transactions (
+CREATE TABLE IF NOT EXISTS transactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     account_id INTEGER NOT NULL,
     amount REAL NOT NULL,
@@ -32,7 +32,7 @@ CREATE TABLE transactions (
 -- target_amount and current_progress are only used by BossQuest,
 -- they stay NULL for Daily and Weekly quests.
 
-CREATE TABLE quests (
+CREATE TABLE IF NOT EXISTS quests (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     quest_type TEXT NOT NULL CHECK (quest_type IN ('daily', 'weekly', 'boss')),
@@ -49,7 +49,7 @@ CREATE TABLE quests (
 -- Backs the PlayerProfile class
 -- Single-row table, this is a one-user app, not multi-player.
 
-CREATE TABLE player_profile (
+CREATE TABLE IF NOT EXISTS player_profile (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     xp INTEGER NOT NULL DEFAULT 0,
     level INTEGER NOT NULL DEFAULT 1,
@@ -58,4 +58,4 @@ CREATE TABLE player_profile (
 );
 
 -- Seed the single player row so the app always has one to read from.
-INSERT INTO player_profile (id, xp, level, streak) VALUES (1, 0, 1, 0);
+INSERT OR IGNORE INTO player_profile (id, xp, level, streak) VALUES (1, 0, 1, 0);
