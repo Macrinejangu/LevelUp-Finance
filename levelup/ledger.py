@@ -6,7 +6,7 @@ amount is signed: positive = deposit, negative = withdrawal.
 """
 
 from datetime import date
-
+from levelup.database import add_transaction
 
 class TransactionLedger:
     def __init__(self, account_id):
