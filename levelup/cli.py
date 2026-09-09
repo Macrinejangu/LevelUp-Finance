@@ -1,16 +1,18 @@
 """
 CLI menu and command routing.
 → Ties every module together into the terminal game loop.
+→ Logging a transaction now checks daily/weekly quest completion and
+  awards XP automatically, then the AI coach narrates it.
 """
 from levelup.database import init_db
 from levelup.accounts import SavingsAccount, CheckingAccount, CreditAccount
 from levelup.ledger import TransactionLedger
 from levelup.budget_engine import BudgetEngine
+from levelup.quests import DailyQuest, WeeklyQuest
 from levelup.player_profile import PlayerProfile
 from levelup.ai_coach import AICoach
 
 
-# → keeps asking until the person types something that's actually a number, instead of crashing the whole app on the first typo
 def get_valid_number(prompt):
     while True:
         raw_value = input(prompt)
@@ -39,6 +41,12 @@ def main():
     account = None
     ledger = None
     budget_engine = None
+
+    # → standing quests for this session, checked every time a transaction gets logged. Awarded flags are in-memory only, they reset if the app restarts, that's a known limitation, not a finished feature.
+    daily_quest = DailyQuest("Log today's transactions", 25)
+    weekly_quest = WeeklyQuest("Log transactions this week", 50)
+    daily_quest_awarded = False
+    weekly_quest_awarded = False
 
     player = PlayerProfile("You")
     player.load()
@@ -98,6 +106,33 @@ def main():
             category = input("Category: ")
             ledger.add_transaction(amount, category)
             print("Transaction logged.")
+
+            # → check quest completion right after logging, this is the wiring that was missing, nothing triggered XP automatically before this
+            if not daily_quest_awarded and daily_quest.check_completion(ledger):
+                leveled_up = player.add_xp(daily_quest.get_reward())
+                player.save()
+                daily_quest_awarded = True
+                summary = {
+                    "event": "quest_completed",
+                    "quest_name": daily_quest.name,
+                    "xp_gained": daily_quest.get_reward(),
+                }
+                print(coach.narrate(summary))
+                if leveled_up:
+                    print(coach.narrate({"event": "level_up", "new_level": leveled_up}))
+
+            if not weekly_quest_awarded and weekly_quest.check_completion(ledger):
+                leveled_up = player.add_xp(weekly_quest.get_reward())
+                player.save()
+                weekly_quest_awarded = True
+                summary = {
+                    "event": "quest_completed",
+                    "quest_name": weekly_quest.name,
+                    "xp_gained": weekly_quest.get_reward(),
+                }
+                print(coach.narrate(summary))
+                if leveled_up:
+                    print(coach.narrate({"event": "level_up", "new_level": leveled_up}))
 
         elif choice == "6":
             if budget_engine is None:
