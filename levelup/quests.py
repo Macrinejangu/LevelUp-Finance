@@ -37,15 +37,21 @@ class WeeklyQuest(Quest):
 
 
 class BossQuest(Quest):
-    def __init__(self, name, reward_xp, target_amount):
-        super().__init__(name, reward_xp)
+    def _init_(self, name, reward_xp, target_amount, category):
+        super()._init_(name, reward_xp)
         self.target_amount = target_amount
+        self.category = category
 
     def get_progress(self, ledger):
         transactions = ledger.get_transactions()
-        total = sum(transaction["amount"] for transaction in transactions)
 
-        return min(abs(total), self.target_amount)
+        total = sum(
+            abs(transaction["amount"])
+            for transaction in transactions
+            if transaction["category"] == self.category
+        )
+
+        return min(total, self.target_amount)
 
     def check_completion(self, ledger):
         return self.get_progress(ledger) >= self.target_amount
