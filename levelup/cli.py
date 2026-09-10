@@ -35,14 +35,43 @@ def show_menu():
     print("9. Exit")
 
 
+def load_existing_account():
+    # → checks if an account was already saved from a previous session,
+    #   and rebuilds it, the ledger, and the budget engine automatically,
+    #   so restarting the app doesn't force you to "create" the same
+    #   account over and over
+    conn = get_connection()
+    row = conn.execute("SELECT name, type, balance FROM accounts WHERE id = 1").fetchone()
+    conn.close()
+
+    if row is None:
+        return None, None, None
+
+    name, account_type, balance = row
+    if account_type == "savings":
+        account = SavingsAccount(name, balance)
+    elif account_type == "checking":
+        account = CheckingAccount(name, balance)
+    elif account_type == "credit":
+        account = CreditAccount(name, balance)
+    else:
+        return None, None, None
+
+    ledger = TransactionLedger(account_id=1)
+    ledger.load()
+    budget_engine = BudgetEngine(ledger)
+    print(f"Welcome back, {name}. Your {account_type} account was reloaded.")
+    return account, ledger, budget_engine
+
+
 def main():
     init_db()
 
-    account = None
-    ledger = None
-    budget_engine = None
+    account, ledger, budget_engine = load_existing_account()
 
-    # → standing quests for this session, checked every time a transaction gets logged. Awarded flags are in-memory only, they reset if the app restarts, that's a known limitation, not a finished feature.
+    # → standing quests for this session, checked every time a transaction
+    #   gets logged. Awarded flags are in-memory only, they reset if the
+    #   app restarts, that's a known limitation, not a finished feature.
     daily_quest = DailyQuest("Log today's transactions", 25)
     weekly_quest = WeeklyQuest("Log transactions this week", 50)
     daily_quest_awarded = False
@@ -72,8 +101,11 @@ def main():
                 print("Not a valid account type.")
                 continue
 
-            # → Account itself doesn't have save()/load() yet, this is a stopgap: write just enough of a row so account_id=1 actually
-            #   exists in the database, which TransactionLedger.save() needs to satisfy the foreign key. Full Account persistence is a known limitation, documented in the README, not built tonight.
+            # → Account itself doesn't have save()/load() yet, this is a
+            #   stopgap: write just enough of a row so account_id=1 actually
+            #   exists in the database, which TransactionLedger.save() needs
+            #   to satisfy the foreign key. Full Account persistence is a
+            #   known limitation, documented in the README, not built tonight.
             conn = get_connection()
             conn.execute(
                 "INSERT OR REPLACE INTO accounts (id, name, type, balance) VALUES (1, ?, ?, ?)",
@@ -119,7 +151,9 @@ def main():
             ledger.save()  # → persist immediately, don't wait until exit
             print("Transaction logged.")
 
-            # → check quest completion right after logging, this is the wiring that was missing, nothing triggered XP automatically before this
+            # → check quest completion right after logging, this is the
+            #   wiring that was missing, nothing triggered XP automatically
+            #   before this
             if not daily_quest_awarded and daily_quest.check_completion(ledger):
                 leveled_up = player.add_xp(daily_quest.get_reward())
                 player.save()
