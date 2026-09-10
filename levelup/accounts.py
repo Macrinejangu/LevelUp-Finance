@@ -4,17 +4,18 @@ class Account:
         self.name = name
         self.balance = balance
 
+
     def get_balance(self):
-         return self.balance
+        return self.balance    
 
     def deposit(self, amount: float):
         if amount <= 0:
-            raise ValueError("Amount must be a number greater than zero")
+            raise ValueError("Amount must be greater than zero")
         self.balance += amount
 
     def withdraw(self, amount: float):
         if amount <= 0:
-            raise ValueError("Amount must be a number greater than zero")
+            raise ValueError("Amount must be greater than zero")
         if amount > self.balance:
             raise ValueError(" You currently have Insufficient funds")
         self.balance -= amount
@@ -27,7 +28,7 @@ class Account:
 class SavingsAccount(Account):
     def apply_monthly(self):
         interest = self.balance * 0.005 if self.balance > 0 else 0
-        self.balance += interest
+        self.balance += interes
         return interest
 
 
@@ -45,7 +46,7 @@ class CreditAccount(Account):
 
     def withdraw(self, amount: float):
         if amount <= 0:
-            raise ValueError("Amount must be positive")
+            raise ValueError("Amount must be greater than zero")
         if amount > self.balance + self.credit_limit:
             raise ValueError("Over credit limit")
         self.balance -= amount

@@ -1,41 +1,104 @@
 """
 TransactionLedger class.
-
-A transaction record is a dictionary with keys: id, account_id, amount, category, date.
-amount is signed: positive = deposit, negative = withdrawal.
+→ A transaction record is a dictionary with keys: id, account_id, amount, category, date.
+→ amount is signed: positive = deposit, negative = withdrawal.
+→ Persists to SQLite via save() and load(), same pattern as PlayerProfile.
 """
-
 from datetime import date
+from levelup.database import get_connection
 
 
 class TransactionLedger:
     def __init__(self, account_id):
-        self.account_id = account_id  #the init method acts automatically thus a number is autiomatically passed when a new ledger is created
-        self.transactions = [] #This creates an empty list where transactions will be storef
+        self.account_id = account_id
+        self.transactions = []
 
-    def add_transaction(self, amount, category, date_str=None): #(date_str=None) means that the date is optional to add 
+    def add_transaction(self, amount, category, date_str=None):
         if date_str is None:
-            date_str = date.today().isoformat() #this is the ISO format 2026-09-11
-#if the person fails to indicate the date the ledger will automatically use the current date like saaa hiiiii
+            date_str = date.today().isoformat()
+
         self.transactions.append({
-            "id": len(self.transactions) + 1, #adds onto the number of transactions belonging to another account
-            "account_id": self.account_id, #it tells you which account the transaction belongs to
+            "id": len(self.transactions) + 1,
+            "account_id": self.account_id,
             "amount": amount,
             "category": category,
             "date": date_str,
         })
-#Retrieving the particular transaction 
+
     def get_transactions(self, start_date=None, end_date=None):
-        result = self.transactions[:]  #this makes a copy of the transactions then filtering is possible if the user provided the dates   
+        result = self.transactions[:]
         if start_date:
-            result = [transaction for transaction in result if transaction["date"] >= start_date] #it filkters the list of transactions to the particular start date
+            result = [t for t in result if t["date"] >= start_date]
         if end_date:
-            result = [transaction for transaction in result if transaction["date"] <= end_date] #it filters the list of transactions from the start date to the particular end date
+            result = [t for t in result if t["date"] <= end_date]
         return result
 
     def get_total_by_category(self, category):
         total = 0
-        for t in self.transactions: #it shows to go through every transaction
-            if t["category"] == category: #for checking whether the transaction belongs to a particular category
+        for t in self.transactions:
+            if t["category"] == category:
                 total += t["amount"]
         return total
+
+    def save(self):
+        conn = get_connection()
+
+        # → delete this account's existing rows first, then reinsert everything
+        #   currently in memory, this keeps the database and self.transactions
+        #   perfectly in sync without needing to track which ones are "new"
+        conn.execute("DELETE FROM transactions WHERE account_id = ?", (self.account_id,))
+
+        for transaction in self.transactions:
+            conn.execute(
+                """
+                INSERT INTO transactions (account_id, amount, category, date)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    transaction["account_id"],
+                    transaction["amount"],
+                    transaction["category"],
+                    transaction["date"],
+                ),
+            )
+
+        conn.commit()
+        conn.close()
+
+    def load(self):
+        conn = get_connection()
+        rows = conn.execute(
+            """
+            SELECT id, account_id, amount, category, date
+            FROM transactions
+            WHERE account_id = ?
+            ORDER BY id
+            """,
+            (self.account_id,),
+        ).fetchall()
+        conn.close()
+
+        # → the ids here come from the database's own auto-increment, not
+        #   the len(self.transactions) + 1 count used when adding in memory,
+        #   loading always reflects what's actually saved
+        self.transactions = [
+            {"id": row[0], "account_id": row[1], "amount": row[2], "category": row[3], "date": row[4]}
+            for row in rows
+        ]
+
+
+# → quick manual test, run this from the project root with:
+#   python3 -m levelup.ledger
+if __name__ == "__main__":
+    ledger = TransactionLedger(account_id=1)
+    ledger.add_transaction(-500, "food")
+    ledger.add_transaction(2000, "income")
+
+    print("Before save:", ledger.get_transactions())
+
+    ledger.save()
+    print("Saved to database.")
+
+    reloaded = TransactionLedger(account_id=1)
+    reloaded.load()
+    print("After reload:", reloaded.get_transactions())

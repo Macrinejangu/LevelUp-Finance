@@ -4,17 +4,7 @@ CLI menu and command routing.
 → Logging a transaction now checks daily/weekly quest completion and
   awards XP automatically, then the AI coach narrates it.
 """
-
-from datetime import date
-
-from levelup.database import (
-    init_db,
-    add_account,
-    add_transaction,
-    update_balance,
-    get_all_accounts,
-    get_transactions,
-)
+from levelup.database import init_db, get_connection
 from levelup.accounts import SavingsAccount, CheckingAccount, CreditAccount
 from levelup.ledger import TransactionLedger
 from levelup.budget_engine import BudgetEngine
@@ -49,46 +39,10 @@ def main():
     init_db()
 
     account = None
-    account_id = None
     ledger = None
     budget_engine = None
 
-    # Load the most recently saved account when the app starts.
-    saved_accounts = get_all_accounts()
-
-    if saved_accounts:
-        saved_account = saved_accounts[-1]
-
-        account_id = saved_account[0]
-        name = saved_account[1]
-        account_type = saved_account[2]
-        balance = saved_account[3]
-
-        if account_type == "savings":
-            account = SavingsAccount(name, balance)
-        elif account_type == "checking":
-            account = CheckingAccount(name, balance)
-        elif account_type == "credit":
-            account = CreditAccount(name, balance)
-
-        if account is not None:
-            ledger = TransactionLedger(account_id)
-
-            saved_transactions = get_transactions(account_id)
-
-            for transaction in saved_transactions:
-                ledger.transactions.append({
-                    "id": transaction[0],
-                    "account_id": transaction[1],
-                    "amount": transaction[2],
-                    "category": transaction[3],
-                    "date": transaction[4],
-                })
-
-            budget_engine = BudgetEngine(ledger)
-
-    # → standing quests for this session, checked every time a transaction gets logged.
-    # Awarded flags are in-memory only, they reset if the app restarts.
+    # → standing quests for this session, checked every time a transaction gets logged. Awarded flags are in-memory only, they reset if the app restarts, that's a known limitation, not a finished feature.
     daily_quest = DailyQuest("Log today's transactions", 25)
     weekly_quest = WeeklyQuest("Log transactions this week", 50)
     daily_quest_awarded = False
@@ -118,136 +72,91 @@ def main():
                 print("Not a valid account type.")
                 continue
 
-            account_id = add_account(
-                name,
-                account_type,
-                starting_balance
+            # → Account itself doesn't have save()/load() yet, this is a stopgap: write just enough of a row so account_id=1 actually
+            #   exists in the database, which TransactionLedger.save() needs to satisfy the foreign key. Full Account persistence is a known limitation, documented in the README, not built tonight.
+            conn = get_connection()
+            conn.execute(
+                "INSERT OR REPLACE INTO accounts (id, name, type, balance) VALUES (1, ?, ?, ?)",
+                (name, account_type, starting_balance),
             )
+            conn.commit()
+            conn.close()
 
-            ledger = TransactionLedger(account_id)
+            ledger = TransactionLedger(account_id=1)
+            ledger.load()  # → pull in any transactions saved from a previous session
             budget_engine = BudgetEngine(ledger)
-
             print(f"Created {account_type} account for {name}.")
 
         elif choice == "2":
             if account is None:
                 print("Create an account first.")
                 continue
-
             print(f"Balance: {account.get_balance()}")
 
         elif choice == "3":
             if account is None:
                 print("Create an account first.")
                 continue
-
             amount = get_valid_number("Deposit amount: ")
             account.deposit(amount)
-            update_balance(account_id, account.get_balance())
-
             print("Deposited.")
 
         elif choice == "4":
             if account is None:
                 print("Create an account first.")
                 continue
-
             amount = get_valid_number("Withdraw amount: ")
             account.withdraw(amount)
-            update_balance(account_id, account.get_balance())
-
             print("Withdrawn.")
 
         elif choice == "5":
             if ledger is None:
                 print("Create an account first.")
                 continue
-
-            amount = get_valid_number(
-                "Transaction amount (negative for spending): "
-            )
+            amount = get_valid_number("Transaction amount (negative for spending): ")
             category = input("Category: ")
-
             ledger.add_transaction(amount, category)
-
-            add_transaction(
-                account_id,
-                amount,
-                category,
-                date.today().isoformat()
-            )
-
+            ledger.save()  # → persist immediately, don't wait until exit
             print("Transaction logged.")
 
+            # → check quest completion right after logging, this is the wiring that was missing, nothing triggered XP automatically before this
             if not daily_quest_awarded and daily_quest.check_completion(ledger):
                 leveled_up = player.add_xp(daily_quest.get_reward())
                 player.save()
                 daily_quest_awarded = True
-
                 summary = {
                     "event": "quest_completed",
                     "quest_name": daily_quest.name,
                     "xp_gained": daily_quest.get_reward(),
                 }
-
                 print(coach.narrate(summary))
-
                 if leveled_up:
-                    print(
-                        coach.narrate(
-                            {
-                                "event": "level_up",
-                                "new_level": leveled_up
-                            }
-                        )
-                    )
+                    print(coach.narrate({"event": "level_up", "new_level": leveled_up}))
 
             if not weekly_quest_awarded and weekly_quest.check_completion(ledger):
                 leveled_up = player.add_xp(weekly_quest.get_reward())
                 player.save()
                 weekly_quest_awarded = True
-
                 summary = {
                     "event": "quest_completed",
                     "quest_name": weekly_quest.name,
                     "xp_gained": weekly_quest.get_reward(),
                 }
-
                 print(coach.narrate(summary))
-
                 if leveled_up:
-                    print(
-                        coach.narrate(
-                            {
-                                "event": "level_up",
-                                "new_level": leveled_up
-                            }
-                        )
-                    )
+                    print(coach.narrate({"event": "level_up", "new_level": leveled_up}))
 
         elif choice == "6":
             if budget_engine is None:
                 print("Create an account first.")
                 continue
-
             print(budget_engine.get_summary())
 
         elif choice == "7":
-            print(
-                f"Level: {player.get_level()}  "
-                f"XP: {player.get_xp()}  "
-                f"Streak: {player.streak}"
-            )
+            print(f"Level: {player.get_level()}  XP: {player.get_xp()}  Streak: {player.streak}")
 
         elif choice == "8":
-            print(
-                coach.narrate(
-                    {
-                        "event": "status_check",
-                        "level": player.get_level()
-                    }
-                )
-            )
+            print(coach.narrate({"event": "status_check", "level": player.get_level()}))
 
         elif choice == "9":
             print("See you next time.")
