@@ -37,8 +37,8 @@ class WeeklyQuest(Quest):
 
 
 class BossQuest(Quest):
-    def _init_(self, name, reward_xp, target_amount, category):
-        super()._init_(name, reward_xp)
+    def __init__(self, name, reward_xp, target_amount, category="savings"):
+        super().__init__(name, reward_xp)
         self.target_amount = target_amount
         self.category = category
 
