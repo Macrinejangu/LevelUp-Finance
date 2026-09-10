@@ -36,10 +36,8 @@ def show_menu():
 
 
 def load_existing_account():
-    # → checks if an account was already saved from a previous session,
-    #   and rebuilds it, the ledger, and the budget engine automatically,
-    #   so restarting the app doesn't force you to "create" the same
-    #   account over and over
+    # → checks if an account was already saved from a previous session, and rebuilds it, the ledger, and the budget engine automatically,
+    #   so restarting the app doesn't force you to "create" the same account over and over
     conn = get_connection()
     row = conn.execute("SELECT name, type, balance FROM accounts WHERE id = 1").fetchone()
     conn.close()
@@ -69,9 +67,7 @@ def main():
 
     account, ledger, budget_engine = load_existing_account()
 
-    # → standing quests for this session, checked every time a transaction
-    #   gets logged. Awarded flags are in-memory only, they reset if the
-    #   app restarts, that's a known limitation, not a finished feature.
+    # → standing quests for this session, checked every time a transaction gets logged. Awarded flags are in-memory only, they reset if the app restarts, that's a known limitation, not a finished feature.
     daily_quest = DailyQuest("Log today's transactions", 25)
     weekly_quest = WeeklyQuest("Log transactions this week", 50)
     daily_quest_awarded = False
@@ -101,10 +97,8 @@ def main():
                 print("Not a valid account type.")
                 continue
 
-            # → Account itself doesn't have save()/load() yet, this is a
-            #   stopgap: write just enough of a row so account_id=1 actually
-            #   exists in the database, which TransactionLedger.save() needs
-            #   to satisfy the foreign key. Full Account persistence is a
+            # → Account itself doesn't have save()/load() yet, this is a stopgap: write just enough of a row so account_id=1 actually
+            #   exists in the database, which TransactionLedger.save() needs to satisfy the foreign key. Full Account persistence is a
             #   known limitation, documented in the README, not built tonight.
             conn = get_connection()
             conn.execute(
@@ -148,9 +142,7 @@ def main():
             amount = get_valid_number("Transaction amount (negative for spending): ")
             category = input("Category: ")
 
-            # → keep balance and logged spending in sync, a transaction and
-            #   an account movement are the same real-world event, they
-            #   shouldn't be two disconnected records
+            # → keep balance and logged spending in sync, a transaction and an account movement are the same real-world event, they shouldn't be two disconnected records
             try:
                 if amount < 0:
                     account.withdraw(abs(amount))
@@ -164,9 +156,7 @@ def main():
             ledger.save()
             print("Transaction logged.")
 
-            # → check quest completion right after logging, this is the
-            #   wiring that was missing, nothing triggered XP automatically
-            #   before this
+            # → check quest completion right after logging, this is the wiring that was missing, nothing triggered XP automatically before this
             if not daily_quest_awarded and daily_quest.check_completion(ledger):
                 leveled_up = player.add_xp(daily_quest.get_reward())
                 player.save()
