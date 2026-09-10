@@ -147,8 +147,21 @@ def main():
                 continue
             amount = get_valid_number("Transaction amount (negative for spending): ")
             category = input("Category: ")
+
+            # → keep balance and logged spending in sync, a transaction and
+            #   an account movement are the same real-world event, they
+            #   shouldn't be two disconnected records
+            try:
+                if amount < 0:
+                    account.withdraw(abs(amount))
+                elif amount > 0:
+                    account.deposit(amount)
+            except ValueError as e:
+                print(f"Transaction rejected: {e}")
+                continue
+
             ledger.add_transaction(amount, category)
-            ledger.save()  # → persist immediately, don't wait until exit
+            ledger.save()
             print("Transaction logged.")
 
             # → check quest completion right after logging, this is the
