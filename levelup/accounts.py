@@ -28,7 +28,7 @@ class Account:
 class SavingsAccount(Account):
     def apply_monthly(self):
         interest = self.balance * 0.005 if self.balance > 0 else 0
-        self.balance += interes
+        self.balance += interest
         return interest
 
 

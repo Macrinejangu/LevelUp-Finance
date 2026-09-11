@@ -5,8 +5,8 @@ It has two jobs:
 1. Open a connection to the database file (get_connection)
 2. Create all the tables the first time the app runs (init_db)
 """
-import sqlite3
-import os
+import sqlite3 #Python's built-in module for working with SQLite databases
+import os #os helps Python find the correct file.
 
 DB_PATH = "levelup_finance.db"
 

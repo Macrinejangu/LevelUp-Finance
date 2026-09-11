@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, timedelta   #timedelta → lets us calculate a date difference, such as "7 days ago."
 
 
 class Quest:
